@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>audio</title>
+
+<style>
+body {
+  margin: 0;
+  height: 100vh;
+  background: #0b0b0b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: monospace;
+  color: #666;
+}
+.wrap { text-align: center; }
+button, a {
+  display: block;
+  margin-top: 8px;
+  background: none;
+  border: none;
+  color: #555;
+  font-size: 12px;
+  cursor: pointer;
+}
+button:hover, a:hover { color: #aaa; }
+</style>
+</head>
+
+<body>
+<div class="wrap">
+  <audio id="player" controls></audio>
+  <button id="reverse">reverse</button>
+  <a id="download" download="reversed.wav">download</a>
+</div>
+
+<script>
+const ctx = new AudioContext();
+let buffer;
+
+fetch("audio.mp3")
+  .then(r => r.arrayBuffer())
+  .then(d => ctx.decodeAudioData(d))
+  .then(b => {
+    buffer = b;
+    play(b);
+  });
+
+function play(buf) {
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+
+  const dest = ctx.createMediaStreamDestination();
+  src.connect(dest);
+  src.connect(ctx.destination);
+  src.start();
+
+  player.srcObject = dest.stream;
+}
+
+reverse.onclick = () => {
+  const r = ctx.createBuffer(
+    buffer.numberOfChannels,
+    buffer.length,
+    buffer.sampleRate
+  );
+
+  for (let c = 0; c < buffer.numberOfChannels; c++) {
+    r.getChannelData(c).set(
+      buffer.getChannelData(c).slice().reverse()
+    );
+  }
+
+  play(r);
+  download.href = makeWav(r);
+};
+
+function makeWav(buf) {
+  const len = buf.length * buf.numberOfChannels * 2 + 44;
+  const ab = new ArrayBuffer(len);
+  const v = new DataView(ab);
+  let o = 0;
+
+  function w(s){ for(let i=0;i<s.length;i++) v.setUint8(o++,s.charCodeAt(i)); }
+
+  w("RIFF"); v.setUint32(o,len-8,true); o+=4;
+  w("WAVEfmt "); v.setUint32(o,16,true); o+=4;
+  v.setUint16(o,1,true); o+=2;
+  v.setUint16(o,buf.numberOfChannels,true); o+=2;
+  v.setUint32(o,buf.sampleRate,true); o+=4;
+  v.setUint32(o,buf.sampleRate*2*buf.numberOfChannels,true); o+=4;
+  v.setUint16(o,buf.numberOfChannels*2,true); o+=2;
+  v.setUint16(o,16,true); o+=2;
+  w("data"); v.setUint32(o,len-o-4,true); o+=4;
+
+  for (let i=0;i<buf.length;i++)
+    for (let c=0;c<buf.numberOfChannels;c++) {
+      v.setInt16(o,buf.getChannelData(c)[i]*32767,true);
+      o+=2;
+    }
+
+  return URL.createObjectURL(new Blob([v],{type:"audio/wav"}));
+}
+</script>
+</body>
+</html>
