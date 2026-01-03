@@ -83,13 +83,18 @@ const originalURL = "audio.mp3";
 // keep slider synced
 audio.addEventListener("timeupdate", () => {
   if (!audio.duration) return;
-  slider.value = (audio.currentTime / audio.duration) * 100;
+  // check if reversed
+  slider.value = isReversed 
+    ? (1 - audio.currentTime / audio.duration) * 100
+    : (audio.currentTime / audio.duration) * 100;
 });
 
 // scrub
 slider.addEventListener("input", () => {
   if (!audio.duration) return;
-  audio.currentTime = (slider.value / 100) * audio.duration;
+  audio.currentTime = isReversed 
+    ? (1 - slider.value / 100) * audio.duration
+    : (slider.value / 100) * audio.duration;
 });
 
 reverseBtn.onclick = async () => {
@@ -111,9 +116,7 @@ reverseBtn.onclick = async () => {
     );
 
     for (let c = 0; c < buffer.numberOfChannels; c++) {
-      reversed
-        .getChannelData(c)
-        .set(buffer.getChannelData(c).slice().reverse());
+      reversed.getChannelData(c).set(buffer.getChannelData(c).slice().reverse());
     }
 
     reversedURL = makeWav(reversed);
@@ -138,6 +141,7 @@ reverseBtn.onclick = async () => {
   audio.play();
 };
 
+// convert buffer to WAV
 function makeWav(buf) {
   const length = buf.length * buf.numberOfChannels * 2 + 44;
   const ab = new ArrayBuffer(length);
